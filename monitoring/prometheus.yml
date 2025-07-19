@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:7071']  # Use JMX exporter for Kafka metrics
+
+  - job_name: 'spark'
+    static_configs:
+      - targets: ['spark:4040']  # Spark master metrics
+      - targets: ['spark-worker:8081']  # Spark worker metrics
+
+  - job_name: 'trino'
+    static_configs:
+      - targets: ['trino:8081']  # Trino coordinator metrics 

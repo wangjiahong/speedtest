@@ -1,0 +1,197 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - speedtest-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - speedtest-net
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    depends_on:
+      - kafka
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    networks:
+      - speedtest-net
+
+  minio:
+    image: minio/minio:RELEASE.2024-03-30T09-41-56Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - speedtest-net
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: iceberg
+      POSTGRES_PASSWORD: iceberg
+      POSTGRES_DB: iceberg
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - speedtest-net
+
+  spark:
+    image: bitnami/spark:3.5.0
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_HOST: spark
+      SPARK_MASTER_PORT: 7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: 2
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - ./spark_jobs:/opt/spark-apps
+    networks:
+      - speedtest-net
+
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark:7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: 2
+    depends_on:
+      - spark
+    networks:
+      - speedtest-net
+
+  airflow:
+    image: apache/airflow:2.8.1
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    depends_on:
+      - airflow-postgres
+      - spark
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./spark_jobs:/opt/spark-apps
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - speedtest-net
+    command: standalone
+
+  airflow-postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-pg-data:/var/lib/postgresql/data
+    networks:
+      - speedtest-net
+
+  trino:
+    image: trinodb/trino:438
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+      - ./trino/config.properties:/etc/trino/config.properties
+      - ./trino/jvm.config:/etc/trino/jvm.config
+      - ./trino/node.properties:/etc/trino/node.properties
+    networks:
+      - speedtest-net
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - speedtest-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+    networks:
+      - speedtest-net
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:4.0.0
+    depends_on:
+      - kafka
+    ports:
+      - "9002:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:9092
+      JVM_OPTS: "-Xms32M -Xmx64M"
+      SERVER_SERVLET_CONTEXTPATH: "/"
+    networks:
+      - speedtest-net
+
+  data-gen:
+    build:
+      context: ./data_gen
+    environment:
+      KAFKA_BROKER: kafka:9092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KAFKA_TOPIC: speedtest_raw
+      RECORDS_TO_GENERATE: 1000000
+      MESSAGES_PER_SECOND: 10
+    depends_on:
+      - kafka
+      - schema-registry
+    networks:
+      - speedtest-net
+    restart: "no"
+
+volumes:
+  minio-data:
+  pg-data:
+  airflow-pg-data:
+
+networks:
+  speedtest-net:
+    driver: bridge 

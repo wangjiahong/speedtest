@@ -1,0 +1,40 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Speedtest Medallion Monitoring",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Kafka Throughput",
+        "targets": [{
+          "expr": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total[1m]))",
+          "legendFormat": "Messages In"
+        }],
+        "datasource": "Prometheus",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "type": "graph",
+        "title": "Spark Job Latency",
+        "targets": [{
+          "expr": "avg(spark_job_duration) by (job_id)",
+          "legendFormat": "Job {{job_id}}"
+        }],
+        "datasource": "Prometheus",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "type": "graph",
+        "title": "Trino Query Performance",
+        "targets": [{
+          "expr": "avg(trino_query_elapsed_time_seconds) by (query_id)",
+          "legendFormat": "Query {{query_id}}"
+        }],
+        "datasource": "Prometheus",
+        "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8}
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+} 

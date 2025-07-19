@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "SpeedtestRecord",
+  "namespace": "com.ookla.speedtest",
+  "fields": [
+    {"name": "timestamp", "type": "long"},
+    {"name": "user_id", "type": "string"},
+    {"name": "upload_speed", "type": "float"},
+    {"name": "download_speed", "type": "float"},
+    {"name": "latency", "type": "float"},
+    {"name": "location", "type": "string"}
+  ]
+} 

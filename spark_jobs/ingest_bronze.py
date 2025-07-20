@@ -3,6 +3,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_date
 from pyspark.sql.types import StructType, StructField, StringType, LongType, FloatType
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +62,9 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 logger.info("====> Spark session created successfully")
+
+# Record start time for metrics
+start_time = time.time()
 
 # Read from Kafka
 logger.info(f"====> Reading from Kafka topic: {KAFKA_TOPIC}")
@@ -128,13 +132,20 @@ TBLPROPERTIES ('format-version'='2')
 logger.info("====> Iceberg table created/verified successfully")
 
 # Write to Iceberg (append mode)
-logger.info(f"====> Writing {df.count()} rows to Iceberg table...")
+final_count = df.count()
+logger.info(f"====> Writing {final_count} rows to Iceberg table...")
 logger.info(df.show(100))
 logger.info('====> end of df')
 
-
 df.writeTo(f"{ICEBERG_CATALOG}.{ICEBERG_DB}.{ICEBERG_TABLE}").append()
 
-logger.info("====> === IngestKafkaToBronzeIceberg Job Completed Successfully ===")
+# Calculate and log metrics
+end_time = time.time()
+processing_time = end_time - start_time
+logger.info(f"====> === Job Metrics ===")
+logger.info(f"====> Total rows processed: {final_count}")
+logger.info(f"====> Processing time: {processing_time:.2f} seconds")
+logger.info(f"====> Processing rate: {final_count/processing_time:.2f} rows/second")
+logger.info(f"====> === IngestKafkaToBronzeIceberg Job Completed Successfully ===")
 
 spark.stop() 

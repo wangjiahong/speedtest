@@ -13,4 +13,9 @@ scrape_configs:
 
   - job_name: 'trino'
     static_configs:
-      - targets: ['trino:8081']  # Trino coordinator metrics 
+      - targets: ['trino:8081']  # Trino coordinator metrics
+
+  - job_name: 'table-metrics'
+    static_configs:
+      - targets: ['table-metrics-exporter:8000']  # Custom table metrics
+    scrape_interval: 30s  # Update every 30 seconds 

@@ -187,6 +187,19 @@ services:
       - speedtest-net
     restart: "no"
 
+  table-metrics-exporter:
+    build:
+      context: ./monitoring
+    environment:
+      TRINO_HOST: trino
+      TRINO_PORT: 8080
+    depends_on:
+      - trino
+      - postgres
+    networks:
+      - speedtest-net
+    restart: unless-stopped
+
 volumes:
   minio-data:
   pg-data:
